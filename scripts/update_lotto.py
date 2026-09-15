@@ -8,7 +8,7 @@ import sys
 import time
 from datetime import date, datetime, timezone
 from pathlib import Path
-
+from urllib.parse import quote
 try:
     import requests
 except ImportError:
@@ -30,28 +30,39 @@ CSV_PATH = ROOT / "data" / "lotto_history.csv"
 JSON_PATH = ROOT / "docs" / "data" / "lotto_history.json"
 
 START_DATE = date(2002, 12, 7)
-SLEEP_BETWEEN = 0.1
+SLEEP_BETWEEN = 0.3
 
 
-def fetch_draw(round_no: int, retries: int = 3) -> dict | None:
-    for attempt in range(1, retries + 1):
-        try:
-            r = requests.get(API.format(round_no), headers=HEADERS, timeout=10)
-            r.raise_for_status()
-            data = r.json()
-            if data.get("returnValue") != "success":
-                return None
-            return {
-                "round": round_no,
-                "date": data.get("drwNoDate", ""),
-                "nums": sorted(int(data[f"drwtNo{i}"]) for i in range(1, 7)),
-                "bonus": int(data["bnusNo"]),
-            }
-        except Exception as e:
-            if attempt == retries:
-                print(f"  [warn] {round_no}회 실패: {e}", flush=True)
-                return None
-            time.sleep(0.5 * attempt)
+def fetch_draw(round_no: int, retries: int = 2) -> dict | None:
+    target = API.format(round_no)
+    urls = [
+        f"https://api.allorigins.win/raw?url={quote(target, safe='')}",
+        f"https://corsproxy.io/?url={quote(target, safe='')}",
+        f"https://thingproxy.freeboard.io/fetch/{target}",
+        target,
+    ]
+
+    for url in urls:
+        for attempt in range(1, retries + 1):
+            try:
+                r = requests.get(url, headers=HEADERS, timeout=15)
+                if r.status_code != 200:
+                    break
+                data = r.json()
+                if data.get("returnValue") != "success":
+                    return None
+                return {
+                    "round": round_no,
+                    "date": data.get("drwNoDate", ""),
+                    "nums": sorted(int(data[f"drwtNo{i}"]) for i in range(1, 7)),
+                    "bonus": int(data["bnusNo"]),
+                }
+            except Exception:
+                if attempt < retries:
+                    time.sleep(0.3)
+                continue
+
+    print(f"  [warn] {round_no}회 실패 (모든 경로)", flush=True)
     return None
 
 
