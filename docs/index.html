@@ -451,7 +451,7 @@ $$('#tabs button').forEach(btn => {
     $$('#tabs button').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     const tab = btn.dataset.tab;
-    ['gen','pattern','backtest','grid','data'].forEach(t => { $('#tab-' + t).hidden = (t !== tab); });
+        ['gen','pattern','backtest','grid','data','my'].forEach(t => {$('#tab-' + t).hidden = (t !== tab); });
     if (tab === 'pattern') renderPattern();
     if (tab === 'data') renderData();
     if (tab === 'my') renderMyGames();
