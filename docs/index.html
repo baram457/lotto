@@ -88,6 +88,7 @@
     <button data-tab="grid">그리드</button>
     <button data-tab="data">데이터</button>
     <button data-tab="my">내 번호</button>
+    <button data-tab="pension">연금복권</button>
   </nav>
 
   <section id="tab-gen">
@@ -171,6 +172,32 @@
       <div id="dataStatus"></div>
     </div>
     <div class="card"><h2>최근 10회</h2><div id="dataPreview"></div></div>
+  </section>
+  <section id="tab-pension" hidden>
+    <div class="card">
+      <h2>연금복권720+ 번호 생성</h2>
+      <div class="sub" style="margin-bottom:12px">
+        1~5조 + 6자리 숫자 · 1등 월 700만원 × 20년
+      </div>
+      <label class="label">게임 수</label>
+      <input type="number" id="pgCount" value="3" min="1" max="10" />
+      <button class="btn" id="btnPgGen" style="margin-top:12px;">번호 생성</button>
+      <div id="pgGenResult" style="margin-top:16px;"></div>
+    </div>
+
+    <div class="card">
+      <h2>연금복권 당첨 확인</h2>
+      <div id="pgEmpty" style="color:#94a3b8; font-size:13px; padding:12px 0;">
+        저장된 번호가 없습니다.<br>
+        위에서 번호를 생성하고 저장해보세요.
+      </div>
+      <div id="pgSavedList"></div>
+    </div>
+
+    <div class="card">
+      <h2>최근 연금복권 당첨번호</h2>
+      <div id="pgDataPreview"></div>
+    </div>
   </section>
 
   <section id="tab-my" hidden>
@@ -788,7 +815,7 @@ for (var tb = 0; tb < tabBtns.length; tb++) {
     for (var i = 0; i < all.length; i++) all[i].classList.remove('active');
     this.classList.add('active');
     var tab = this.dataset.tab;
-    var sections = ['gen','pattern','backtest','grid','data','my'];
+    v    var sections = ['gen','pattern','backtest','grid','data','my','pension'];
     for (var j = 0; j < sections.length; j++) {
       var el = document.getElementById('tab-' + sections[j]);
       if (el) el.hidden = (sections[j] !== tab);
@@ -796,6 +823,7 @@ for (var tb = 0; tb < tabBtns.length; tb++) {
     if (tab === 'pattern') renderPattern();
     if (tab === 'data') renderData();
     if (tab === 'my') renderMyGames();
+    if (tab === 'pension') renderPension();
   });
 }
 
@@ -1026,6 +1054,208 @@ if ('serviceWorker' in navigator) {
   }, 500);
   requestNotificationPermission();
 })();
+/* ============================================================
+   연금복권720+
+============================================================ */
+var PENSION_DRAWS = [];
+var PENSION_STORAGE = 'pensionSavedGames_v1';
+
+function loadPensionGames() {
+  try {
+    var raw = localStorage.getItem(PENSION_STORAGE);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) { return []; }
+}
+function writePensionGames(arr) {
+  try { localStorage.setItem(PENSION_STORAGE, JSON.stringify(arr)); } catch (e) {}
+}
+
+function generatePensionNumbers() {
+  var group = Math.floor(randFloat() * 5) + 1;
+  var digits = [];
+  for (var i = 0; i < 6; i++) digits.push(Math.floor(randFloat() * 10));
+  return { group: group, digits: digits };
+}
+
+function judgePension(game, draw) {
+  var gGroup = String(game.group);
+  var dGroup = String(draw.group);
+  var gDigits = game.digits.join('');
+  var dDigits = (draw.numbers || []).join('');
+
+  if (gGroup === dGroup && gDigits === dDigits) {
+    return { rank: 1, label: '1등', desc: '월 700만원 x 20년' };
+  }
+  if (gDigits === dDigits) {
+    return { rank: 2, label: '2등', desc: '월 100만원 x 10년' };
+  }
+
+  var matchLen = 0;
+  for (var i = 5; i >= 0; i--) {
+    if (gDigits[i] === dDigits[i]) matchLen++;
+    else break;
+  }
+
+  if (matchLen >= 5) return { rank: 3, label: '3등', desc: '100만원' };
+  if (matchLen >= 4) return { rank: 4, label: '4등', desc: '10만원' };
+  if (matchLen >= 3) return { rank: 5, label: '5등', desc: '5만원' };
+  if (matchLen >= 2) return { rank: 6, label: '6등', desc: '5천원' };
+  if (matchLen >= 1) return { rank: 7, label: '7등', desc: '1천원' };
+
+  return { rank: 0, label: '낙첨', desc: '' };
+}
+
+function renderPension() {
+  var preview = document.getElementById('pgDataPreview');
+  if (preview) {
+    if (!PENSION_DRAWS.length) {
+      preview.innerHTML = '<div class="err">데이터 로딩 중...</div>';
+    } else {
+      var last = PENSION_DRAWS.slice(-5).reverse();
+      var html = '<table><thead><tr><th>회차</th><th>당첨번호</th></tr></thead><tbody>';
+      for (var i = 0; i < last.length; i++) {
+        var d = last[i];
+        var nums = (d.numbers || []).join('');
+        html += '<tr><td>' + d.draw_no + '</td><td>' + d.group + '조 ' + nums + '</td></tr>';
+      }
+      html += '</tbody></table>';
+      preview.innerHTML = html;
+    }
+  }
+  renderPensionSaved();
+}
+
+function renderPensionSaved() {
+  var list = document.getElementById('pgSavedList');
+  var empty = document.getElementById('pgEmpty');
+  if (!list) return;
+  var games = loadPensionGames();
+  if (!games.length) {
+    list.innerHTML = '';
+    if (empty) empty.style.display = 'block';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+
+  var html = '';
+  for (var i = 0; i < games.length; i++) {
+    var g = games[i];
+    var nums = g.digits.join('');
+    var status = '대기중 (제 ' + g.targetRound + '회)';
+    var color = '#f59e0b';
+    if (g.checked) {
+      if (g.rank > 0) { status = '🎉 ' + g.rankLabel; color = '#10b981'; }
+      else { status = '낙첨'; color = '#64748b'; }
+    }
+    html += '<div class="game" style="padding:10px; border:1px solid #334155; border-radius:10px; margin-bottom:8px;">';
+    html += '<div style="display:flex; justify-content:space-between; margin-bottom:6px;">';
+    html += '<span style="font-size:12px; color:#94a3b8;">제 ' + g.targetRound + '회</span>';
+    html += '<span style="font-size:12px; color:' + color + '; font-weight:600;">' + status + '</span>';
+    html += '</div>';
+    html += '<div style="font-size:16px; font-family:monospace; color:#e5e7eb; letter-spacing:2px;">' + g.group + '조 ' + nums + '</div>';
+    if (g.checked && g.actualNumbers) {
+      html += '<div style="font-size:11px; color:#64748b; margin-top:6px;">실제: ' + g.actualGroup + '조 ' + g.actualNumbers.join('') + '</div>';
+    }
+    html += '<button type="button" data-pgdel="' + g.id + '" style="margin-top:8px; padding:4px 10px; font-size:11px; background:#7f1d1d; color:#fff; border:none; border-radius:6px; cursor:pointer;">삭제</button>';
+    html += '</div>';
+  }
+  list.innerHTML = html;
+
+  var btns = list.querySelectorAll('button[data-pgdel]');
+  for (var k = 0; k < btns.length; k++) {
+    btns[k].addEventListener('click', function(e) {
+      var id = e.currentTarget.getAttribute('data-pgdel');
+      var arr = loadPensionGames().filter(function(x) { return x.id !== id; });
+      writePensionGames(arr);
+      renderPensionSaved();
+    });
+  }
+}
+
+document.getElementById('btnPgGen').addEventListener('click', function() {
+  var count = Math.max(1, Math.min(10, +document.getElementById('pgCount').value || 3));
+  var res = document.getElementById('pgGenResult');
+  var games = [];
+  for (var i = 0; i < count; i++) games.push(generatePensionNumbers());
+
+  var html = '';
+  for (var j = 0; j < games.length; j++) {
+    var g = games[j];
+    html += '<div class="game" style="padding:10px; border:1px solid #334155; border-radius:10px; margin-bottom:8px;">';
+    html += '<div style="display:flex; justify-content:space-between; align-items:center;">';
+    html += '<div style="font-size:16px; font-family:monospace; color:#e5e7eb; letter-spacing:2px;">' + g.group + '조 ' + g.digits.join('') + '</div>';
+    html += '<div style="display:flex; gap:6px;">';
+    html += '<button type="button" onclick="window._copyPension(\'' + g.group + '조 ' + g.digits.join('') + '\', this)" style="padding:4px 10px; font-size:11px; background:#334155; color:#fff; border:none; border-radius:6px; cursor:pointer;">복사</button>';
+    html += '<button type="button" onclick="window._savePension(\'' + g.group + '\',\'' + g.digits.join('') + '\', this)" style="padding:4px 10px; font-size:11px; background:#10b981; color:#fff; border:none; border-radius:6px; cursor:pointer;">저장</button>';
+    html += '</div></div></div>';
+  }
+  res.innerHTML = html;
+});
+
+window._copyPension = function(text, btn) {
+  copyTextToClipboard(text, btn);
+};
+
+window._savePension = function(group, digits, btn) {
+  var games = loadPensionGames();
+  var key = group + ':' + digits;
+  for (var i = 0; i < games.length; i++) {
+    if (games[i].group + ':' + games[i].digits.join('') === key) {
+      btn.textContent = '이미 저장됨';
+      setTimeout(function() { btn.textContent = '저장'; }, 1500);
+      return;
+    }
+  }
+  var latestRound = PENSION_DRAWS.length ? PENSION_DRAWS[PENSION_DRAWS.length - 1].draw_no : 0;
+  games.push({
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    group: parseInt(group, 10),
+    digits: digits.split('').map(function(s) { return parseInt(s, 10); }),
+    savedAt: new Date().toISOString(),
+    targetRound: latestRound + 1,
+    checked: false,
+    rank: null,
+    rankLabel: null
+  });
+  writePensionGames(games);
+  btn.textContent = '저장됨';
+  setTimeout(function() { btn.textContent = '저장'; }, 1500);
+};
+
+async function loadPensionData() {
+  try {
+    var res = await fetch('./data/pension_history.json?t=' + Date.now(), { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    var payload = await res.json();
+    PENSION_DRAWS = (payload.draws || []).sort(function(a, b) { return a.draw_no - b.draw_no; });
+    console.log('연금복권 데이터 로드:', PENSION_DRAWS.length + '회차');
+    checkPensionGames();
+  } catch (e) {
+    console.warn('연금복권 데이터 없음:', e);
+    PENSION_DRAWS = [];
+  }
+}
+
+function checkPensionGames() {
+  var games = loadPensionGames();
+  if (!games.length) return;
+  var map = {};
+  for (var i = 0; i < PENSION_DRAWS.length; i++) map[PENSION_DRAWS[i].draw_no] = PENSION_DRAWS[i];
+  var changed = false;
+  for (var j = 0; j < games.length; j++) {
+    var g = games[j];
+    var draw = map[g.targetRound];
+    if (!draw || g.checked) continue;
+    var result = judgePension(g, draw);
+    g.checked = true;
+    g.rank = result.rank;
+    g.rankLabel = result.label;
+    g.actualGroup = draw.group;
+    g.actualNumbers = draw.numbers;
+    changed = true;
+  }
+  if (changed) writePensionGames(games);
+}
 </script>
 </body>
 </html>
