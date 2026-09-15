@@ -87,7 +87,8 @@
     <button data-tab="pattern">패턴 분석</button>
     <button data-tab="backtest">백테스트</button>
     <button data-tab="grid">그리드</button>
-    <button data-tab="data">데이터</button>
+        <button data-tab="data">데이터</button>
+    <button data-tab="my">내 번호</button>
   </nav>
 
   <section id="tab-gen">
@@ -164,6 +165,24 @@
   </section>
 
   <section id="tab-data" hidden>
+  <section id="tab-my" hidden>
+    <div class="card" id="myNotifCard" style="display:none; background:#10b981;">
+      <h2 style="color:#fff; margin:0;">🎉 축하합니다!</h2>
+      <div id="myNotifText" style="color:#fff; margin-top:8px; font-size:14px;"></div>
+    </div>
+
+    <div class="card">
+      <h2>내 저장 번호</h2>
+      <div id="myEmpty" style="color:#94a3b8; font-size:13px; padding:12px 0;">
+        저장된 번호가 없습니다.<br>
+        "번호 생성" 탭에서 마음에 드는 게임을 저장해보세요.
+      </div>
+      <div id="myGamesList"></div>
+      <button type="button" class="btn sec" id="btnCheckAll" style="margin-top:12px;">전체 당첨 확인</button>
+      <button type="button" class="btn sec" id="btnClearAll" style="margin-top:8px; background:#7f1d1d;">전체 삭제</button>
+    </div>
+  </section>
+
     <div class="card">
       <h2>데이터</h2>
       <div id="dataInfo"></div>
@@ -435,6 +454,7 @@ $$('#tabs button').forEach(btn => {
     ['gen','pattern','backtest','grid','data'].forEach(t => { $('#tab-' + t).hidden = (t !== tab); });
     if (tab === 'pattern') renderPattern();
     if (tab === 'data') renderData();
+    if (tab === 'my') renderMyGames();
   });
 });
 
@@ -465,7 +485,208 @@ $('#btnGen').addEventListener('click', () => {
     const config = { recentWindow, useWeights: $('#fWeight').checked, useSumFilter: $('#fSum').checked, useOddEven: $('#fOdd').checked, useHighLow: $('#fHigh').checked, useConsecutive: $('#fCons').checked, useEnding: $('#fEnd').checked, avoidPopular: $('#fPopular').checked, poolSize: 3000, topK: 200 };
     const a = new PatternAnalyzer(DRAWS, recentWindow);
     const games = generateGames(a, count, config, randFloat);
-           window._copyText = function(text, btn) {
+   // ============================================================
+// 내 번호 저장 / 당첨 확인
+// ============================================================
+const MY_STORAGE_KEY = 'lottoSavedGames_v1';
+
+function loadSavedGames() {
+  try {
+    const raw = localStorage.getItem(MY_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) { return []; }
+}
+
+function writeSavedGames(arr) {
+  try { localStorage.setItem(MY_STORAGE_KEY, JSON.stringify(arr)); } catch (e) {}
+}
+
+window._saveGame = function(btn) {
+  const numsStr = btn.getAttribute('data-nums');
+  const nums = numsStr.split(',').map(function(s){ return parseInt(s, 10); });
+  const games = loadSavedGames();
+  const key = nums.join(',');
+  for (let i = 0; i < games.length; i++) {
+    if (games[i].numbers.join(',') === key) {
+      btn.textContent = '이미 저장됨';
+      setTimeout(function(){ btn.textContent = '저장'; }, 1500);
+      return;
+    }
+  }
+  const latestRound = DRAWS.length ? DRAWS[DRAWS.length - 1].round_no : 0;
+  games.push({
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+    numbers: nums,
+    savedAt: new Date().toISOString(),
+    targetRound: latestRound + 1,
+    checked: false,
+    rank: null,
+    rankLabel: null
+  });
+  writeSavedGames(games);
+  btn.textContent = '저장됨 ✓';
+  setTimeout(function(){ btn.textContent = '저장'; }, 1500);
+};
+
+function judgeGameRank(gameNums, winNums, bonus) {
+  const winSet = {};
+  for (let i = 0; i < winNums.length; i++) winSet[winNums[i]] = true;
+  let matched = 0;
+  for (let i = 0; i < gameNums.length; i++) {
+    if (winSet[gameNums[i]]) matched++;
+  }
+  if (matched === 6) return { rank: 1, label: '1등', matched: matched };
+  if (matched === 5) {
+    if (bonus && gameNums.indexOf(bonus) !== -1) return { rank: 2, label: '2등', matched: matched };
+    return { rank: 3, label: '3등', matched: matched };
+  }
+  if (matched === 4) return { rank: 4, label: '4등', matched: matched };
+  if (matched === 3) return { rank: 5, label: '5등', matched: matched };
+  return { rank: 0, label: '낙첨', matched: matched };
+}
+
+function checkSavedGames(showNotification) {
+  const games = loadSavedGames();
+  if (!games.length) return { checked: 0, newWins: [] };
+
+  const drawMap = {};
+  for (let i = 0; i < DRAWS.length; i++) {
+    drawMap[DRAWS[i].round_no] = DRAWS[i];
+  }
+
+  let changed = false;
+  const newWins = [];
+
+  for (let i = 0; i < games.length; i++) {
+    const g = games[i];
+    const targetDraw = drawMap[g.targetRound];
+    if (!targetDraw) continue;
+    if (g.checked) continue;
+
+    const result = judgeGameRank(g.numbers, targetDraw.numbers, targetDraw.bonus);
+    g.checked = true;
+    g.rank = result.rank;
+    g.rankLabel = result.label;
+    g.matched = result.matched;
+    g.actualNumbers = targetDraw.numbers;
+    g.actualBonus = targetDraw.bonus;
+    changed = true;
+
+    if (result.rank > 0) {
+      newWins.push({ game: g, result: result, round: targetDraw.round_no });
+    }
+  }
+
+  if (changed) writeSavedGames(games);
+
+  if (showNotification && newWins.length) {
+    showWinNotification(newWins);
+  }
+
+  return { checked: games.length, newWins: newWins };
+}
+
+function showWinNotification(wins) {
+  const banner = document.getElementById('myNotifCard');
+  const text = document.getElementById('myNotifText');
+  if (!banner || !text) return;
+
+  let msg = '';
+  for (let i = 0; i < wins.length; i++) {
+    const w = wins[i];
+    msg += '🎯 ' + w.round + '회 ' + w.result.label + ' — ' + w.game.numbers.map(function(n){ return String(n).padStart(2,'0'); }).join(' ') + '<br>';
+  }
+  text.innerHTML = msg;
+  banner.style.display = 'block';
+
+  if ('Notification' in window && Notification.permission === 'granted') {
+    try {
+      new Notification('로또 당첨!', { body: wins.map(function(w){ return w.result.label; }).join(', '), icon: '/lotto/icon.svg' });
+    } catch (e) {}
+  }
+}
+
+function renderMyGames() {
+  const list = document.getElementById('myGamesList');
+  const empty = document.getElementById('myEmpty');
+  if (!list) return;
+  const games = loadSavedGames();
+
+  if (!games.length) {
+    list.innerHTML = '';
+    if (empty) empty.style.display = 'block';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+
+  games.sort(function(a, b) { return (b.savedAt || '').localeCompare(a.savedAt || ''); });
+
+  let html = '';
+  for (let i = 0; i < games.length; i++) {
+    const g = games[i];
+    const nums = g.numbers.map(function(n){ return String(n).padStart(2,'0'); }).join(' ');
+    let status = '';
+    let statusColor = '#94a3b8';
+
+    if (g.checked) {
+      if (g.rank && g.rank > 0) {
+        status = '🎉 ' + g.rankLabel;
+        statusColor = '#10b981';
+      } else {
+        status = '낙첨';
+        statusColor = '#64748b';
+      }
+    } else {
+      status = '대기중 (제 ' + g.targetRound + '회)';
+      statusColor = '#f59e0b';
+    }
+
+    html += '<div class="game" style="padding:10px; border:1px solid #334155; border-radius:10px; margin-bottom:8px;">';
+    html += '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">';
+    html += '<span style="font-size:12px; color:#94a3b8;">제 ' + g.targetRound + '회</span>';
+    html += '<span style="font-size:12px; color:' + statusColor + '; font-weight:600;">' + status + '</span>';
+    html += '</div>';
+    html += '<div style="font-size:15px; font-family:monospace; color:#e5e7eb; letter-spacing:1px;">' + nums + '</div>';
+    if (g.checked && g.actualNumbers) {
+      const actual = g.actualNumbers.map(function(n){ return String(n).padStart(2,'0'); }).join(' ');
+      html += '<div style="font-size:11px; color:#64748b; margin-top:6px;">실제: ' + actual + (g.actualBonus ? ' + ' + String(g.actualBonus).padStart(2,'0') : '') + '</div>';
+    }
+    html += '<button type="button" onclick="window._deleteGame(\'' + g.id + '\')" style="margin-top:8px; padding:4px 10px; font-size:11px; background:#7f1d1d; color:#fff; border:none; border-radius:6px; cursor:pointer;">삭제</button>';
+    html += '</div>';
+  }
+  list.innerHTML = html;
+}
+
+window._deleteGame = function(id) {
+  const games = loadSavedGames().filter(function(g){ return g.id !== id; });
+  writeSavedGames(games);
+  renderMyGames();
+};
+
+window._checkAll = function() {
+  const res = checkSavedGames(true);
+  renderMyGames();
+  if (res.newWins.length === 0) {
+    alert('새로 확인된 당첨이 없습니다.');
+  }
+};
+
+window._clearAll = function() {
+  if (!confirm('저장된 모든 번호를 삭제할까요?')) return;
+  writeSavedGames([]);
+  const banner = document.getElementById('myNotifCard');
+  if (banner) banner.style.display = 'none';
+  renderMyGames();
+};
+
+// 알림 권한 요청
+function requestNotificationPermission() {
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+}
+        
+window._copyText = function(text, btn) {
       var done = function() {
         if (!btn) return;
         var orig = btn.textContent;
@@ -525,6 +746,7 @@ $('#btnGen').addEventListener('click', () => {
       html += '<span style="display:flex; gap:8px; align-items:center;">';
       html += '<span>score ' + g.score.toFixed(3) + ' · 합계 ' + sum + '</span>';
       html += '<button type="button" onclick="window._copyGame(this)" data-nums="' + g.numbers.join(' ') + '" style="padding:4px 10px; font-size:11px; background:#334155; color:#fff; border:none; border-radius:6px; cursor:pointer;">복사</button>';
+      html += '<button type="button" onclick="window._saveGame(this)" data-nums="' + g.numbers.join(',') + '" style="padding:4px 10px; font-size:11px; background:#10b981; color:#fff; border:none; border-radius:6px; cursor:pointer;">저장</button>';
       html += '</span>';
       html += '</div>';
       html += renderBalls(g.numbers);
@@ -620,6 +842,21 @@ $('#btnGrid').addEventListener('click', () => {
   await loadDataFromServer();
   if (!DRAWS.length) { document.getElementById('dataBadge').className = 'badge sample'; document.getElementById('dataBadge').textContent = '데이터 없음'; }
   renderData();
+
+  // 저장된 번호 자동 확인
+  setTimeout(function() {
+    checkSavedGames(true);
+    renderMyGames();
+  }, 500);
+
+  // 알림 권한 요청
+  requestNotificationPermission();
+
+  // 버튼 이벤트 등록
+  var btnCheck = document.getElementById('btnCheckAll');
+  if (btnCheck) btnCheck.addEventListener('click', window._checkAll);
+  var btnClear = document.getElementById('btnClearAll');
+  if (btnClear) btnClear.addEventListener('click', window._clearAll);
 })();
 
 // Service Worker 등록 (PWA)
