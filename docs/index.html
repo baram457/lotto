@@ -815,7 +815,7 @@ for (var tb = 0; tb < tabBtns.length; tb++) {
     for (var i = 0; i < all.length; i++) all[i].classList.remove('active');
     this.classList.add('active');
     var tab = this.dataset.tab;
-    v    var sections = ['gen','pattern','backtest','grid','data','my','pension'];
+       var sections = ['gen','pattern','backtest','grid','data','my','pension'];
     for (var j = 0; j < sections.length; j++) {
       var el = document.getElementById('tab-' + sections[j]);
       if (el) el.hidden = (sections[j] !== tab);
@@ -1052,7 +1052,8 @@ if ('serviceWorker' in navigator) {
     checkSavedGames(true);
     renderMyGames();
   }, 500);
-  requestNotificationPermission();
+    requestNotificationPermission();
+  loadPensionData();
 })();
 /* ============================================================
    연금복권720+
