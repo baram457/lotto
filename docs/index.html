@@ -459,9 +459,56 @@ $('#btnGen').addEventListener('click', () => {
     const config = { recentWindow, useWeights: $('#fWeight').checked, useSumFilter: $('#fSum').checked, useOddEven: $('#fOdd').checked, useHighLow: $('#fHigh').checked, useConsecutive: $('#fCons').checked, useEnding: $('#fEnd').checked, avoidPopular: $('#fPopular').checked, poolSize: 3000, topK: 200 };
     const a = new PatternAnalyzer(DRAWS, recentWindow);
     const games = generateGames(a, count, config, randFloat);
-       let html = '';
+           window._copyText = function(text, btn) {
+      var done = function() {
+        if (!btn) return;
+        var orig = btn.textContent;
+        btn.textContent = '복사됨';
+        setTimeout(function(){ btn.textContent = orig; }, 1500);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(function(){
+          var ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          try { document.execCommand('copy'); } catch(e) {}
+          document.body.removeChild(ta);
+          done();
+        });
+      } else {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); } catch(e) {}
+        document.body.removeChild(ta);
+        done();
+      }
+    };
+
+    window._copyGame = function(btn) {
+      var nums = btn.getAttribute('data-nums');
+      window._copyText(nums, btn);
+    };
+
+    window._copyAll = function(btn) {
+      var lines = [];
+      for (var i = 0; i < games.length; i++) {
+        var g = games[i];
+        var padded = g.numbers.map(function(n){ return String(n).padStart(2,'0'); }).join(' ');
+        lines.push((i+1) + '게임: ' + padded);
+      }
+      window._copyText(lines.join('\n'), btn);
+    };
+
+    let html = '';
     html += '<div style="display:flex; gap:8px; margin-bottom:12px;">';
-    html += '<button type="button" id="btnCopyAll" style="flex:1; padding:12px; font-size:14px; background:#334155; color:#fff; border:none; border-radius:10px; cursor:pointer; font-weight:600;">전체 복사</button>';
+    html += '<button type="button" onclick="window._copyAll(this)" style="flex:1; padding:12px; font-size:14px; background:#334155; color:#fff; border:none; border-radius:10px; cursor:pointer; font-weight:600;">전체 복사</button>';
     html += '</div>';
     for (let i = 0; i < games.length; i++) {
       const g = games[i];
@@ -471,7 +518,7 @@ $('#btnGen').addEventListener('click', () => {
       html += '<span>' + (i+1) + '게임</span>';
       html += '<span style="display:flex; gap:8px; align-items:center;">';
       html += '<span>score ' + g.score.toFixed(3) + ' · 합계 ' + sum + '</span>';
-      html += '<button type="button" class="btn-copy" data-nums="' + g.numbers.join(' ') + '" style="padding:4px 10px; font-size:11px; background:#334155; color:#fff; border:none; border-radius:6px; cursor:pointer;">복사</button>';
+      html += '<button type="button" onclick="window._copyGame(this)" data-nums="' + g.numbers.join(' ') + '" style="padding:4px 10px; font-size:11px; background:#334155; color:#fff; border:none; border-radius:6px; cursor:pointer;">복사</button>';
       html += '</span>';
       html += '</div>';
       html += renderBalls(g.numbers);
@@ -479,36 +526,6 @@ $('#btnGen').addEventListener('click', () => {
     }
     res.innerHTML = html;
     st.innerHTML = '';
-
-    // 개별 복사 버튼 이벤트
-    document.querySelectorAll('.btn-copy').forEach(function(btn) {
-      btn.addEventListener('click', function(e) {
-        const nums = e.currentTarget.dataset.nums;
-        navigator.clipboard.writeText(nums).then(function() {
-          const orig = e.currentTarget.textContent;
-          e.currentTarget.textContent = '복사됨';
-          setTimeout(function(){ e.currentTarget.textContent = orig; }, 1500);
-        });
-      });
-    });
-
-    // 전체 복사 버튼 이벤트
-    const btnAll = document.getElementById('btnCopyAll');
-    if (btnAll) {
-      btnAll.addEventListener('click', function() {
-        const lines = [];
-        for (let i = 0; i < games.length; i++) {
-          const g = games[i];
-          const padded = g.numbers.map(function(n){ return String(n).padStart(2,'0'); }).join(' ');
-          lines.push((i+1) + '게임: ' + padded);
-        }
-        navigator.clipboard.writeText(lines.join('\n')).then(function() {
-          const orig = btnAll.textContent;
-          btnAll.textContent = '전체 복사됨!';
-          setTimeout(function(){ btnAll.textContent = orig; }, 1500);
-        });
-      });
-    }
   } catch (e) { st.innerHTML = `<div class="err">오류: ${e.message}</div>`; }
 });
 
