@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" />
+<meta name="theme-color" content="#FF4B4B" />
+<meta name="description" content="로또 6/45 패턴 분석 및 번호 생성" />
+<title>로또 6/45 패턴 생성기</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans KR', sans-serif;
+    background: #0f172a; color: #e5e7eb; min-height: 100vh;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .app { max-width: 720px; margin: 0 auto; padding: 16px 16px 60px; }
+  header { padding: 20px 0 12px; text-align: center; }
+  h1 { font-size: 22px; font-weight: 700; }
+  .sub { font-size: 12px; color: #94a3b8; margin-top: 6px; line-height: 1.5; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; margin-top: 8px; }
+  .badge.live { background: rgba(16,185,129,0.15); color: #10b981; }
+  .badge.sample { background: rgba(245,158,11,0.15); color: #f59e0b; }
+  .badge.loading { background: rgba(148,163,184,0.15); color: #94a3b8; }
+  nav.tabs { display: flex; gap: 6px; margin: 18px 0; overflow-x: auto; padding-bottom: 4px; }
+  nav.tabs button { flex: 0 0 auto; padding: 9px 14px; border-radius: 999px; background: #1e293b; color: #cbd5e1; font-size: 13px; border: none; cursor: pointer; white-space: nowrap; }
+  nav.tabs button.active { background: #FF4B4B; color: #fff; font-weight: 600; }
+  .card { background: #1e293b; border-radius: 14px; padding: 16px; margin-bottom: 12px; }
+  .card h2 { font-size: 15px; margin-bottom: 12px; font-weight: 600; }
+  .label { font-size: 13px; color: #94a3b8; margin-bottom: 6px; display: block; }
+  input[type=number], select, textarea, input[type=file] { width: 100%; padding: 10px 12px; border-radius: 10px; background: #0f172a; color: #e5e7eb; border: 1px solid #334155; font-size: 14px; font-family: inherit; }
+  input[type=file] { padding: 8px; }
+  .btn { width: 100%; padding: 13px; border-radius: 12px; background: #FF4B4B; color: #fff; font-size: 15px; font-weight: 600; border: none; cursor: pointer; margin-top: 12px; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn.sec { background: #334155; }
+  .row { display: flex; gap: 8px; }
+  .row > * { flex: 1; }
+  .check { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 13px; color: #cbd5e1; }
+  .check input { width: auto; }
+  .game { margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid #334155; }
+  .game:last-child { border-bottom: none; }
+  .game-meta { font-size: 12px; color: #94a3b8; margin-bottom: 6px; display: flex; justify-content: space-between; }
+  .balls { display: flex; gap: 6px; flex-wrap: wrap; }
+  .ball { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; color: #fff; box-shadow: inset 0 -3px 0 rgba(0,0,0,0.25); }
+  .c1 { background: #f59e0b; } .c2 { background: #3b82f6; } .c3 { background: #ef4444; } .c4 { background: #6b7280; } .c5 { background: #10b981; }
+  .metric { display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px; }
+  .metric .k { color: #94a3b8; }
+  .metric .v { font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 8px 6px; border-bottom: 1px solid #334155; text-align: left; }
+  th { color: #94a3b8; font-weight: 500; }
+  .bar-wrap { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 2px 0; }
+  .bar-label { width: 26px; color: #94a3b8; text-align: right; }
+  .bar { height: 14px; background: #FF4B4B; border-radius: 4px; min-width: 2px; }
+  .bar.alt { background: #3b82f6; }
+  .bar-val { color: #94a3b8; font-size: 11px; }
+  .freq-grid { display: grid; grid-template-columns: repeat(9, 1fr); gap: 3px; }
+  .freq-cell { aspect-ratio: 1; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; background: #0f172a; color: #cbd5e1; }
+  .ok { font-size: 12px; color: #10b981; margin-top: 8px; }
+  .err { font-size: 12px; color: #ef4444; margin-top: 8px; }
+  details { margin-top: 10px; }
+  summary { cursor: pointer; color: #94a3b8; font-size: 13px; padding: 6px 0; }
+  pre { background: #0f172a; padding: 10px; border-radius: 8px; font-size: 11px; overflow-x: auto; color: #cbd5e1; }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #94a3b8; border-top-color: transparent; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  footer { text-align: center; font-size: 11px; color: #64748b; margin-top: 30px; line-height: 1.6; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>🎯 로또 6/45 패턴 생성기</h1>
+    <div id="dataBadge" class="badge loading">데이터 로딩 중...</div>
+    <div class="sub" style="margin-top:10px">
+      1등 확률 <b>1 / 8,145,060</b> · 어떤 분석도 확률을 바꾸지 않습니다<br>
+      패턴은 인기 조합 회피를 통한 <b>분배금 리스크 완화</b> 목적입니다
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <button data-tab="gen" class="active">번호 생성</button>
+    <button data-tab="pattern">패턴 분석</button>
+    <button data-tab="backtest">백테스트</button>
+    <button data-tab="grid">그리드</button>
+    <button data-tab="data">데이터</button>
+  </nav>
+
+  <section id="tab-gen">
+    <div class="card">
+      <h2>생성 옵션</h2>
+      <div class="row">
+        <div><label class="label">게임 수</label><input type="number" id="genCount" value="5" min="1" max="20" /></div>
+        <div><label class="label">최근 N회</label><input type="number" id="genWindow" value="50" min="5" max="200" /></div>
+      </div>
+      <div style="margin-top:12px">
+        <label class="check"><input type="checkbox" id="fPopular" checked> 인기 조합 회피</label>
+        <label class="check"><input type="checkbox" id="fSum" checked> 합계 분포 필터</label>
+        <label class="check"><input type="checkbox" id="fOdd" checked> 홀짝 필터 (2~4)</label>
+        <label class="check"><input type="checkbox" id="fHigh" checked> 고저 필터 (2~4)</label>
+        <label class="check"><input type="checkbox" id="fCons" checked> 연속번호 필터 (≤2)</label>
+        <label class="check"><input type="checkbox" id="fEnd" checked> 끝수 중복 필터 (≤2)</label>
+        <label class="check"><input type="checkbox" id="fWeight" checked> 출현 가중치 사용</label>
+      </div>
+      <button class="btn" id="btnGen">번호 생성</button>
+      <div id="genStatus"></div>
+    </div>
+    <div id="genResult"></div>
+  </section>
+
+  <section id="tab-pattern" hidden>
+    <div class="card"><h2>요약</h2><div id="patternSummary"></div></div>
+    <div class="card">
+      <h2>번호별 출현 빈도</h2>
+      <div class="sub" style="margin-bottom:8px">전체 <span style="color:#FF4B4B">■</span> · 최근 N회 <span style="color:#3b82f6">■</span></div>
+      <div id="freqGrid"></div>
+    </div>
+    <div class="card"><h2>합계 분포</h2><div id="sumHist"></div></div>
+    <div class="card"><h2>자주 나온 번호 쌍 Top 10</h2><div id="pairList"></div></div>
+  </section>
+
+  <section id="tab-backtest" hidden>
+    <div class="card">
+      <h2>워크포워드 백테스트</h2>
+      <div class="sub" style="margin-bottom:12px">각 회차는 <b>그 이전 데이터만</b> 사용합니다.</div>
+      <div class="row">
+        <div><label class="label">회차당 게임</label><input type="number" id="btGames" value="3" min="1" max="10" /></div>
+        <div><label class="label">워밍업</label><input type="number" id="btWarmup" value="50" min="10" max="500" /></div>
+        <div><label class="label">시드</label><input type="number" id="btSeed" value="42" /></div>
+      </div>
+      <button class="btn" id="btnBt">실행</button>
+      <div id="btStatus"></div>
+    </div>
+    <div id="btResult"></div>
+  </section>
+
+  <section id="tab-grid" hidden>
+    <div class="card">
+      <h2>필터 조합 자동 비교</h2>
+      <div class="sub" style="margin-bottom:12px">7개 필터 on/off 128조합 자동 백테스트</div>
+      <div class="row">
+        <div><label class="label">회차당 게임</label><input type="number" id="gGames" value="2" min="1" max="5" /></div>
+        <div><label class="label">워밍업</label><input type="number" id="gWarmup" value="50" min="10" max="500" /></div>
+        <div><label class="label">시드</label><input type="number" id="gSeed" value="42" /></div>
+      </div>
+      <button class="btn" id="btnGrid">그리드 실행</button>
+      <div id="gridStatus"></div>
+    </div>
+    <div id="gridResult"></div>
+  </section>
+
+  <section id="tab-data" hidden>
+    <div class="card">
+      <h2>데이터</h2>
+      <div id="dataInfo"></div>
+      <button class="btn sec" id="btnReload" style="margin-top:12px">서버에서 다시 불러오기</button>
+      <div id="dataStatus"></div>
+    </div>
+    <div class="card"><h2>최근 10회</h2><div id="dataPreview"></div></div>
+  </section>
+
+  <footer>
+    ⚠️ 정보 제공 목적입니다. 로또는 독립시행 확률 게임이며,<br>
+    어떤 분석도 당첨 확률을 높일 수 없습니다.
+  </footer>
+</div>
+
+<script>
+function randFloat() { const b = new Uint32Array(1); crypto.getRandomValues(b); return b[0] / 4294967296; }
+function mulberry32(seed) { let s = seed >>> 0; return function () { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+
+let DRAWS = [];
+let DATA_SOURCE = 'loading';
+
+async function loadDataFromServer() {
+  const badge = document.getElementById('dataBadge');
+  badge.className = 'badge loading';
+  badge.textContent = '데이터 로딩 중...';
+  try {
+    const res = await fetch('./data/lotto_history.json?t=' + Date.now(), { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const payload = await res.json();
+    if (!payload.draws || !payload.draws.length) throw new Error('빈 데이터');
+    DRAWS = payload.draws.sort((a, b) => a.round_no - b.round_no);
+    DATA_SOURCE = 'live';
+    badge.className = 'badge live';
+    const updated = payload.updated_at ? new Date(payload.updated_at).toLocaleString('ko-KR') : '-';
+    badge.textContent = `실데이터 · ${DRAWS.length}회 · 갱신 ${updated}`;
+    renderData();
+    return true;
+  } catch (e) {
+    console.warn('서버 데이터 로드 실패:', e);
+    DATA_SOURCE = 'sample';
+    badge.className = 'badge sample';
+    badge.textContent = '샘플 데이터 (서버 데이터 없음)';
+    return false;
+  }
+}
+
+class PatternAnalyzer {
+  constructor(draws, recentWindow = 50) {
+    this.draws = draws; this.recentWindow = recentWindow;
+    this.freq = new Array(46).fill(0);
+    this.recentFreq = new Array(46).fill(0);
+    this.lastSeen = new Array(46).fill(-1);
+    this.sums = []; this.oddCounts = []; this.highCounts = []; this.consecutiveCounts = [];
+    this.pairCounts = new Map();
+    this._analyze();
+  }
+  _analyze() {
+    for (let i = 0; i < this.draws.length; i++) {
+      const d = this.draws[i];
+      for (const n of d.numbers) { this.freq[n]++; this.lastSeen[n] = i; }
+      let s = 0, odd = 0, high = 0;
+      for (const n of d.numbers) { s += n; if (n % 2) odd++; if (n >= 23) high++; }
+      this.sums.push(s); this.oddCounts.push(odd); this.highCounts.push(high);
+      let cons = 0;
+      for (let k = 0; k < 5; k++) if (d.numbers[k+1] === d.numbers[k] + 1) cons++;
+      this.consecutiveCounts.push(cons);
+      for (let a = 0; a < 6; a++) for (let b = a + 1; b < 6; b++) {
+        const key = d.numbers[a] + ',' + d.numbers[b];
+        this.pairCounts.set(key, (this.pairCounts.get(key) || 0) + 1);
+      }
+    }
+    const start = Math.max(0, this.draws.length - this.recentWindow);
+    for (let i = start; i < this.draws.length; i++) {
+      for (const n of this.draws[i].numbers) this.recentFreq[n]++;
+    }
+  }
+  get total() { return this.draws.length; }
+  gap(n) { const last = this.lastSeen[n]; return last >= 0 ? this.total - 1 - last : this.total; }
+  numberWeights(wF = 0.45, wR = 0.35, wG = 0.20) {
+    let mF = 1, mR = 1, mG = 1;
+    for (let n = 1; n <= 45; n++) {
+      if (this.freq[n] > mF) mF = this.freq[n];
+      if (this.recentFreq[n] > mR) mR = this.recentFreq[n];
+      const g = this.gap(n); if (g > mG) mG = g;
+    }
+    const w = {};
+    for (let n = 1; n <= 45; n++) w[n] = wF * (this.freq[n] / mF) + wR * (this.recentFreq[n] / mR) + wG * (this.gap(n) / mG);
+    return w;
+  }
+  mode(arr) { const c = new Map(); for (const v of arr) c.set(v, (c.get(v) || 0) + 1); let bv = -1, bk = 0; for (const [k, v] of c) if (v > bv) { bv = v; bk = k; } return bk; }
+  percentile(arr, p) { if (!arr.length) return 0; const s = [...arr].sort((a, b) => a - b); const k = (s.length - 1) * p / 100; const f = Math.floor(k), c = Math.ceil(k); if (f === c) return s[k]; return s[f] * (c - k) + s[c] * (k - f); }
+  topPairs(n = 10) { return [...this.pairCounts.entries()].map(([k, v]) => ({ pair: k.split(',').map(Number), count: v })).sort((a, b) => b.count - a.count).slice(0, n); }
+}
+
+function weightedSample(weights, k, rngFn) {
+  const pool = []; for (let n = 1; n <= 45; n++) pool.push(n);
+  const chosen = [];
+  for (let i = 0; i < k; i++) {
+    let total = 0; for (const n of pool) total += weights[n];
+    if (total <= 0) { chosen.push(pool.splice(Math.floor(rngFn() * pool.length), 1)[0]); continue; }
+    const r = rngFn() * total; let acc = 0, picked = false;
+    for (let j = 0; j < pool.length; j++) { acc += weights[pool[j]]; if (acc >= r) { chosen.push(pool.splice(j, 1)[0]); picked = true; break; } }
+    if (!picked) chosen.push(pool.pop());
+  }
+  return chosen;
+}
+function isPopular(nums) {
+  if (nums.every(n => n <= 31)) return true;
+  if (nums.join(',') === '1,2,3,4,5,6') return true;
+  const diffs = []; for (let i = 0; i < 5; i++) diffs.push(nums[i+1] - nums[i]);
+  return diffs.every(d => d === diffs[0]);
+}
+function patternScore(nums, a) {
+  const sum = nums.reduce((x, y) => x + y, 0);
+  const p10 = a.percentile(a.sums, 10), p90 = a.percentile(a.sums, 90);
+  const mean = a.sums.reduce((x, y) => x + y, 0) / (a.sums.length || 1);
+  let sumScore = (sum >= p10 && sum <= p90) ? 1 - Math.abs(sum - mean) / Math.max(1, (p90 - p10) / 2) : -1;
+  const odd = nums.filter(n => n % 2).length, high = nums.filter(n => n >= 23).length;
+  const oddScore = odd === a.mode(a.oddCounts) ? 1 : 0.3, highScore = high === a.mode(a.highCounts) ? 1 : 0.3;
+  let cons = 0; for (let i = 0; i < 5; i++) if (nums[i+1] === nums[i] + 1) cons++;
+  const consScore = cons <= 1 ? 1 : (cons === 2 ? 0.5 : -0.5);
+  const endings = nums.map(n => n % 10); const ec = {}; for (const e of endings) ec[e] = (ec[e] || 0) + 1;
+  const endingScore = Math.max(...Object.values(ec)) <= 2 ? 1 : 0;
+  let pairTotal = 0; for (let i = 0; i < 6; i++) for (let j = i + 1; j < 6; j++) pairTotal += a.pairCounts.get(nums[i] + ',' + nums[j]) || 0;
+  let maxPair = 1; for (const v of a.pairCounts.values()) if (v > maxPair) maxPair = v;
+  const pairScore = pairTotal / Math.max(1, maxPair * 15);
+  return 0.35 * sumScore + 0.15 * oddScore + 0.15 * highScore + 0.15 * consScore + 0.10 * endingScore + 0.10 * pairScore;
+}
+function generateGames(a, count, cfg, rngFn = randFloat) {
+  const weights = cfg.useWeights ? a.numberWeights() : (() => { const w = {}; for (let n = 1; n <= 45; n++) w[n] = 1; return w; })();
+  const p10 = a.sums.length ? a.percentile(a.sums, 10) : 0, p90 = a.sums.length ? a.percentile(a.sums, 90) : 999;
+  const poolSize = cfg.poolSize || 2000, topK = cfg.topK || 200;
+  const candidates = [], seen = new Set();
+  let attempts = 0; const maxAttempts = poolSize * 100;
+  while (candidates.length < poolSize && attempts < maxAttempts) {
+    attempts++;
+    const nums = weightedSample(weights, 6, rngFn).sort((x, y) => x - y);
+    const key = nums.join(','); if (seen.has(key)) continue; seen.add(key);
+    if (cfg.avoidPopular && isPopular(nums)) continue;
+    const sum = nums.reduce((x, y) => x + y, 0);
+    if (cfg.useSumFilter && (sum < p10 || sum > p90)) continue;
+    const odd = nums.filter(n => n % 2).length; if (cfg.useOddEven && (odd < 2 || odd > 4)) continue;
+    const high = nums.filter(n => n >= 23).length; if (cfg.useHighLow && (high < 2 || high > 4)) continue;
+    let cons = 0; for (let i = 0; i < 5; i++) if (nums[i+1] === nums[i] + 1) cons++;
+    if (cfg.useConsecutive && cons > 2) continue;
+    const endings = nums.map(n => n % 10); const ec = {}; for (const e of endings) ec[e] = (ec[e] || 0) + 1;
+    if (cfg.useEnding && Math.max(...Object.values(ec)) > 2) continue;
+    candidates.push({ score: patternScore(nums, a), nums });
+  }
+  if (!candidates.length) {
+    for (let i = 0; i < Math.max(count, topK); i++) {
+      const pool = []; for (let n = 1; n <= 45; n++) pool.push(n);
+      const nums = []; for (let k = 0; k < 6; k++) nums.push(pool.splice(Math.floor(rngFn() * pool.length), 1)[0]);
+      nums.sort((x, y) => x - y); candidates.push({ score: 0, nums });
+    }
+  }
+  candidates.sort((x, y) => y.score - x.score);
+  const top = candidates.slice(0, topK);
+  const minScore = top.length ? top[top.length - 1].score : 0;
+  const weighted = top.map(c => ({ w: Math.max(0.001, c.score - minScore + 0.1), nums: c.nums }));
+  const chosen = [], chosenSet = new Set();
+  for (let i = 0; i < count; i++) {
+    let pick = null;
+    for (let att = 0; att < 500; att++) {
+      let total = 0; for (const x of weighted) total += x.w;
+      const r = rngFn() * total; let acc = 0, picked = weighted[weighted.length - 1].nums;
+      for (const x of weighted) { acc += x.w; if (acc >= r) { picked = x.nums; break; } }
+      if (!chosenSet.has(picked.join(','))) { pick = picked; break; }
+    }
+    if (!pick) {
+      for (let att = 0; att < 500; att++) {
+        const pool = []; for (let n = 1; n <= 45; n++) pool.push(n);
+        const nums = []; for (let k = 0; k < 6; k++) nums.push(pool.splice(Math.floor(rngFn() * pool.length), 1)[0]);
+        nums.sort((x, y) => x - y); if (!chosenSet.has(nums.join(','))) { pick = nums; break; }
+      }
+    }
+    if (pick) { chosen.push(pick); chosenSet.add(pick.join(',')); }
+  }
+  const scoreMap = new Map(); for (const c of candidates) scoreMap.set(c.nums.join(','), c.score);
+  return chosen.map(nums => ({ numbers: nums, score: scoreMap.get(nums.join(',')) || 0 }));
+}
+
+function judgeRank(gameNums, winNums, bonus) {
+  const winSet = new Set(winNums); let matched = 0;
+  for (const n of gameNums) if (winSet.has(n)) matched++;
+  if (matched === 6) return { rank: 1, label: '1등', matched };
+  if (matched === 5) { if (bonus != null && gameNums.includes(bonus)) return { rank: 2, label: '2등', matched }; return { rank: 3, label: '3등', matched }; }
+  if (matched === 4) return { rank: 4, label: '4등', matched };
+  if (matched === 3) return { rank: 5, label: '5등', matched };
+  return { rank: 0, label: '낙첨', matched };
+}
+
+function runBacktest(draws, opts) {
+  const { gamesPerRound = 3, config, warmup = 50, seed = 42, strategy = 'pattern', progressCb } = opts;
+  const rng = mulberry32(seed);
+  const stats = { gamesPlayed: 0, matchDistribution: {}, prizeCounts: {}, bestMatch: 0, bestRank: 99, totalMatches: 0, perRound: [] };
+  const totalRounds = Math.max(0, draws.length - 1 - warmup);
+  for (let i = warmup; i < draws.length - 1; i++) {
+    const history = draws.slice(0, i + 1); const actual = draws[i + 1];
+    let games;
+    if (strategy === 'random') {
+      const s = new Set(); games = [];
+      while (games.length < gamesPerRound) {
+        const pool = []; for (let n = 1; n <= 45; n++) pool.push(n);
+        const nums = []; for (let k = 0; k < 6; k++) nums.push(pool.splice(Math.floor(rng() * pool.length), 1)[0]);
+        nums.sort((a, b) => a - b); if (s.has(nums.join(','))) continue; s.add(nums.join(','));
+        games.push({ numbers: nums, score: 0 });
+      }
+    } else {
+      const a = new PatternAnalyzer(history, config.recentWindow || 50);
+      games = generateGames(a, gamesPerRound, config, rng);
+    }
+    const roundResult = { round: actual.round_no, actual: actual.numbers, bonus: actual.bonus, matches: [], ranks: [], bestRank: null };
+    let bestR = 99;
+    for (const g of games) {
+      const r = judgeRank(g.numbers, actual.numbers, actual.bonus);
+      stats.gamesPlayed++;
+      stats.matchDistribution[r.matched] = (stats.matchDistribution[r.matched] || 0) + 1;
+      stats.prizeCounts[r.label] = (stats.prizeCounts[r.label] || 0) + 1;
+      stats.totalMatches += r.matched;
+      if (r.matched > stats.bestMatch) stats.bestMatch = r.matched;
+      if (r.rank > 0 && r.rank < stats.bestRank) stats.bestRank = r.rank;
+      if (r.rank > 0 && r.rank < bestR) bestR = r.rank;
+      roundResult.matches.push(r.matched); roundResult.ranks.push(r.label);
+    }
+    roundResult.bestRank = bestR === 99 ? null : bestR;
+    stats.perRound.push(roundResult);
+    if (progressCb && (i - warmup) % 5 === 0) progressCb((i - warmup + 1) / Math.max(1, totalRounds));
+  }
+  if (progressCb) progressCb(1);
+  stats.avgMatches = stats.gamesPlayed ? stats.totalMatches / stats.gamesPlayed : 0;
+  stats.hitRate3Plus = stats.gamesPlayed ? Object.entries(stats.matchDistribution).filter(([k]) => +k >= 3).reduce((a, [, v]) => a + v, 0) / stats.gamesPlayed : 0;
+  stats.hitRatePrize = stats.gamesPlayed ? Object.entries(stats.prizeCounts).filter(([k]) => k !== '낙첨').reduce((a, [, v]) => a + v, 0) / stats.gamesPlayed : 0;
+  stats.bestRank = stats.bestRank === 99 ? null : stats.bestRank;
+  return stats;
+}
+
+const FILTER_KEYS = ['useWeights','useSumFilter','useOddEven','useHighLow','useConsecutive','useEnding','avoidPopular'];
+function gridBacktest(draws, opts, progressCb) {
+  const { gamesPerRound = 2, warmup = 50, seed = 42, recentWindow = 50 } = opts;
+  const combos = [];
+  for (let mask = 0; mask < (1 << FILTER_KEYS.length); mask++) {
+    const combo = {}; FILTER_KEYS.forEach((k, i) => { combo[k] = !!(mask & (1 << i)); });
+    combos.push(combo);
+  }
+  const results = [];
+  for (let i = 0; i < combos.length; i++) {
+    const combo = combos[i];
+    const config = { ...combo, recentWindow, poolSize: 500, topK: 100 };
+    const stats = runBacktest(draws, { gamesPerRound, config, warmup, seed, strategy: 'pattern' });
+    results.push({ combo, gamesPlayed: stats.gamesPlayed, avgMatches: stats.avgMatches, hitRate3Plus: stats.hitRate3Plus, hitRatePrize: stats.hitRatePrize, bestMatch: stats.bestMatch, bestRank: stats.bestRank, prizeCounts: stats.prizeCounts });
+    if (progressCb) progressCb((i + 1) / combos.length, i + 1, combos.length);
+  }
+  results.sort((a, b) => b.hitRatePrize - a.hitRatePrize);
+  return results;
+}
+
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => document.querySelectorAll(s);
+const ballClass = (n) => n <= 10 ? 'c1' : n <= 20 ? 'c2' : n <= 30 ? 'c3' : n <= 40 ? 'c4' : 'c5';
+function renderBalls(nums) { return `<div class="balls">${nums.map(n => `<div class="ball ${ballClass(n)}">${String(n).padStart(2, '0')}</div>`).join('')}</div>`; }
+
+$$('#tabs button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    $$('#tabs button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const tab = btn.dataset.tab;
+    ['gen','pattern','backtest','grid','data'].forEach(t => { $('#tab-' + t).hidden = (t !== tab); });
+    if (tab === 'pattern') renderPattern();
+    if (tab === 'data') renderData();
+  });
+});
+
+function renderData() {
+  const info = $('#dataInfo'), prev = $('#dataPreview');
+  if (!DRAWS.length) { info.innerHTML = '<div class="err">데이터가 없습니다.</div>'; prev.innerHTML = ''; return; }
+  info.innerHTML = `
+    <div class="metric"><span class="k">소스</span><span class="v">${DATA_SOURCE === 'live' ? '서버(실데이터)' : '내장 샘플'}</span></div>
+    <div class="metric"><span class="k">총 회차</span><span class="v">${DRAWS.length}</span></div>
+    <div class="metric"><span class="k">최신 회차</span><span class="v">${DRAWS[DRAWS.length-1].round_no}회</span></div>
+  `;
+  const last = DRAWS.slice(-10).reverse();
+  prev.innerHTML = `<table><thead><tr><th>회차</th><th>번호</th><th>보너스</th></tr></thead><tbody>${last.map(d => `<tr><td>${d.round_no}</td><td>${d.numbers.map(n => String(n).padStart(2,'0')).join(' ')}</td><td>${d.bonus != null ? String(d.bonus).padStart(2,'0') : '-'}</td></tr>`).join('')}</tbody></table>`;
+}
+
+$('#btnReload').addEventListener('click', async () => {
+  const st = $('#dataStatus'); st.innerHTML = '<span class="spinner"></span>불러오는 중...';
+  const ok = await loadDataFromServer();
+  if (ok) st.innerHTML = '<div class="ok">✓ 갱신 완료</div>';
+  else st.innerHTML = '<div class="err">서버 데이터 로드 실패 (샘플 유지)</div>';
+});
+
+$('#btnGen').addEventListener('click', () => {
+  const st = $('#genStatus'), res = $('#genResult');
+  try {
+    const count = Math.max(1, Math.min(20, +$('#genCount').value || 5));
+    const recentWindow = Math.max(5, Math.min(200, +$('#genWindow').value || 50));
+    const config = { recentWindow, useWeights: $('#fWeight').checked, useSumFilter: $('#fSum').checked, useOddEven: $('#fOdd').checked, useHighLow: $('#fHigh').checked, useConsecutive: $('#fCons').checked, useEnding: $('#fEnd').checked, avoidPopular: $('#fPopular').checked, poolSize: 3000, topK: 200 };
+    const a = new PatternAnalyzer(DRAWS, recentWindow);
+    const games = generateGames(a, count, config, randFloat);
+    res.innerHTML = games.map((g, i) => `<div class="card game"><div class="game-meta"><span>${i + 1}게임</span><span>score ${g.score.toFixed(3)} · 합계 ${g.numbers.reduce((x,y)=>x+y,0)}</span></div>${renderBalls(g.numbers)}</div>`).join('');
+    st.innerHTML = '';
+  } catch (e) { st.innerHTML = `<div class="err">오류: ${e.message}</div>`; }
+});
+
+function renderPattern() {
+  if (!DRAWS.length) return;
+  const recentWindow = Math.max(5, Math.min(200, +$('#genWindow').value || 50));
+  const a = new PatternAnalyzer(DRAWS, recentWindow);
+  const sumMean = a.sums.reduce((x, y) => x + y, 0) / (a.sums.length || 1);
+  const p10 = a.percentile(a.sums, 10), p90 = a.percentile(a.sums, 90);
+  $('#patternSummary').innerHTML = `
+    <div class="metric"><span class="k">총 회차</span><span class="v">${a.total}</span></div>
+    <div class="metric"><span class="k">평균 합계</span><span class="v">${sumMean.toFixed(1)}</span></div>
+    <div class="metric"><span class="k">합계 P10~P90</span><span class="v">${p10.toFixed(0)} ~ ${p90.toFixed(0)}</span></div>
+    <div class="metric"><span class="k">홀수 최빈</span><span class="v">${a.mode(a.oddCounts)}개</span></div>
+    <div class="metric"><span class="k">고번호 최빈</span><span class="v">${a.mode(a.highCounts)}개</span></div>
+  `;
+  let mF = 1, mR = 1;
+  for (let n = 1; n <= 45; n++) { if (a.freq[n] > mF) mF = a.freq[n]; if (a.recentFreq[n] > mR) mR = a.recentFreq[n]; }
+  const cells = [];
+  for (let n = 1; n <= 45; n++) {
+    const fi = a.freq[n] / mF, ri = a.recentFreq[n] / mR;
+    const bg = `rgba(255,75,75,${0.15 + fi * 0.85})`;
+    const border = ri > 0.5 ? '2px solid #3b82f6' : '2px solid transparent';
+    cells.push(`<div class="freq-cell" style="background:${bg};border:${border}" title="전체 ${a.freq[n]} · 최근 ${a.recentFreq[n]}">${n}</div>`);
+  }
+  $('#freqGrid').innerHTML = `<div class="freq-grid">${cells.join('')}</div>`;
+  const bins = {};
+  for (const s of a.sums) { const b = Math.floor(s / 10) * 10; bins[b] = (bins[b] || 0) + 1; }
+  const sorted = Object.keys(bins).map(Number).sort((x, y) => x - y);
+  const maxBin = Math.max(...Object.values(bins), 1);
+  $('#sumHist').innerHTML = sorted.map(b => `<div class="bar-wrap"><span class="bar-label">${b}</span><div class="bar" style="width:${(bins[b] / maxBin * 100)}%"></div><span class="bar-val">${bins[b]}</span></div>`).join('');
+  const pairs = a.topPairs(10);
+  $('#pairList').innerHTML = pairs.map(p => `<div class="bar-wrap"><span style="width:60px">${String(p.pair[0]).padStart(2,'0')} · ${String(p.pair[1]).padStart(2,'0')}</span><div class="bar alt" style="width:${p.count / pairs[0].count * 70}%"></div><span class="bar-val">${p.count}회</span></div>`).join('');
+}
+
+$('#btnBt').addEventListener('click', () => {
+  const st = $('#btStatus'), res = $('#btResult');
+  try {
+    const gamesPerRound = Math.max(1, Math.min(10, +$('#btGames').value || 3));
+    const warmup = Math.max(10, Math.min(500, +$('#btWarmup').value || 50));
+    const seed = +$('#btSeed').value || 42;
+    if (DRAWS.length <= warmup + 1) throw new Error(`데이터 부족 (필요: ${warmup + 2}회 이상)`);
+    st.innerHTML = '<span class="spinner"></span>실행 중...';
+    setTimeout(() => {
+      const config = { useWeights: true, useSumFilter: true, useOddEven: true, useHighLow: true, useConsecutive: true, useEnding: true, avoidPopular: true, recentWindow: 50, poolSize: 1000, topK: 150 };
+      const stats = runBacktest(DRAWS, { gamesPerRound, warmup, seed, config });
+      res.innerHTML = `<div class="card"><h2>결과</h2>
+        <div class="metric"><span class="k">총 게임</span><span class="v">${stats.gamesPlayed}</span></div>
+        <div class="metric"><span class="k">평균 적중</span><span class="v">${stats.avgMatches.toFixed(4)}</span></div>
+        <div class="metric"><span class="k">3개+ 적중률</span><span class="v">${(stats.hitRate3Plus * 100).toFixed(2)}%</span></div>
+        <div class="metric"><span class="k">당첨(5등+)</span><span class="v">${(stats.hitRatePrize * 100).toFixed(2)}%</span></div>
+        <div class="metric"><span class="k">최고 등수</span><span class="v">${stats.bestRank ?? '-'}등</span></div>
+        <details><summary>등수 분포</summary><pre>${JSON.stringify(stats.prizeCounts, null, 2)}</pre></details></div>`;
+      st.innerHTML = '<div class="ok">✓ 완료</div>';
+    }, 20);
+  } catch (e) { st.innerHTML = `<div class="err">오류: ${e.message}</div>`; }
+});
+
+$('#btnGrid').addEventListener('click', () => {
+  const st = $('#gridStatus'), res = $('#gridResult');
+  try {
+    const gamesPerRound = Math.max(1, Math.min(5, +$('#gGames').value || 2));
+    const warmup = Math.max(10, Math.min(500, +$('#gWarmup').value || 50));
+    const seed = +$('#gSeed').value || 42;
+    if (DRAWS.length <= warmup + 1) throw new Error(`데이터 부족 (필요: ${warmup + 2}회 이상)`);
+    st.innerHTML = '<span class="spinner"></span>실행 중...'; res.innerHTML = '';
+    setTimeout(() => {
+      const results = gridBacktest(DRAWS, { gamesPerRound, warmup, seed });
+      const top = results.slice(0, 15);
+      res.innerHTML = `<div class="card"><h2>상위 15개 조합 (당첨률 순)</h2><div style="overflow-x:auto"><table><thead><tr><th>#</th>${FILTER_KEYS.map(k => `<th>${k.replace('use','').replace('Filter','')}</th>`).join('')}<th>당첨률</th><th>3+</th><th>평균</th><th>최고</th></tr></thead><tbody>${top.map((r, i) => `<tr><td>${i + 1}</td>${FILTER_KEYS.map(k => `<td>${r.combo[k] ? '✓' : '·'}</td>`).join('')}<td>${(r.hitRatePrize * 100).toFixed(2)}%</td><td>${(r.hitRate3Plus * 100).toFixed(2)}%</td><td>${r.avgMatches.toFixed(3)}</td><td>${r.bestRank ?? '-'}</td></tr>`).join('')}</tbody></table></div></div>`;
+      st.innerHTML = `<div class="ok">✓ 완료 (${results.length}조합)</div>`;
+    }, 20);
+  } catch (e) { st.innerHTML = `<div class="err">오류: ${e.message}</div>`; }
+});
+
+(async function init() {
+  await loadDataFromServer();
+  if (!DRAWS.length) { document.getElementById('dataBadge').className = 'badge sample'; document.getElementById('dataBadge').textContent = '데이터 없음'; }
+  renderData();
+})();
+</script>
+</body>
+</html>
