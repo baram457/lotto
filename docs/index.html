@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" />
 <meta name="theme-color" content="#FF4B4B" />
 <meta name="description" content="로또 6/45 패턴 분석 및 번호 생성" />
+<link rel="manifest" href="/lotto/manifest.json">
+<meta name="theme-color" content="#FF4B4B">
+<link rel="apple-touch-icon" href="/lotto/icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="로또생성기">
 <title>로또 6/45 패턴 생성기</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -615,6 +621,17 @@ $('#btnGrid').addEventListener('click', () => {
   if (!DRAWS.length) { document.getElementById('dataBadge').className = 'badge sample'; document.getElementById('dataBadge').textContent = '데이터 없음'; }
   renderData();
 })();
+
+// Service Worker 등록 (PWA)
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('/lotto/sw.js').then(function(reg) {
+      console.log('SW registered:', reg.scope);
+    }).catch(function(err) {
+      console.warn('SW failed:', err);
+    });
+  });
+}
 </script>
 </body>
 </html>

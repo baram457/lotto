@@ -1,0 +1,20 @@
+{
+  "name": "로또 6/45 패턴 생성기",
+  "short_name": "로또생성기",
+  "description": "로또 6/45 패턴 분석 및 번호 생성",
+  "start_url": "/lotto/",
+  "scope": "/lotto/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f172a",
+  "theme_color": "#FF4B4B",
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "/lotto/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
