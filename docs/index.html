@@ -87,8 +87,20 @@
   <section id="tab-gen">
     <div class="card">
       <h2>생성 옵션</h2>
-      <div class="row">
-        <div><label class="label">게임 수</label><input type="number" id="genCount" value="5" min="1" max="20" /></div>
+            <div class="row">
+        <div>
+          <label class="label">게임 수</label>
+          <input type="number" id="genCount" value="5" min="1" max="20" />
+          <div style="display:flex; gap:6px; margin-top:6px;">
+            <button type="button" class="btn-quick" data-add="-1" style="flex:1; padding:6px; font-size:12px; background:#334155; color:#fff; border:none; border-radius:6px; cursor:pointer;">-1</button>
+            <button type="button" class="btn-quick" data-add="1" style="flex:1; padding:6px; font-size:12px; background:#334155; color:#fff; border:none; border-radius:6px; cursor:pointer;">+1</button>
+            <button type="button" class="btn-quick" data-add="2" style="flex:1; padding:6px; font-size:12px; background:#334155; color:#fff; border:none; border-radius:6px; cursor:pointer;">+2</button>
+            <button type="button" class="btn-quick" data-add="3" style="flex:1; padding:6px; font-size:12px; background:#334155; color:#fff; border:none; border-radius:6px; cursor:pointer;">+3</button>
+            <button type="button" class="btn-quick" data-add="5" style="flex:1; padding:6px; font-size:12px; background:#334155; color:#fff; border:none; border-radius:6px; cursor:pointer;">+5</button>
+          </div>
+        </div>
+        <div><label class="label">최근 N회</label><input type="number" id="genWindow" value="50" min="5" max="200" /></div>
+      </div>
         <div><label class="label">최근 N회</label><input type="number" id="genWindow" value="50" min="5" max="200" /></div>
       </div>
       <div style="margin-top:12px">
@@ -507,6 +519,15 @@ $('#btnBt').addEventListener('click', () => {
       st.innerHTML = '<div class="ok">✓ 완료</div>';
     }, 20);
   } catch (e) { st.innerHTML = `<div class="err">오류: ${e.message}</div>`; }
+});
+document.querySelectorAll('.btn-quick').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const input = document.getElementById('genCount');
+    const add = parseInt(btn.dataset.add);
+    let val = parseInt(input.value) || 5;
+    val = Math.max(1, Math.min(20, val + add));
+    input.value = val;
+  });
 });
 
 $('#btnGrid').addEventListener('click', () => {
